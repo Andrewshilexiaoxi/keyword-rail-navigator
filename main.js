@@ -88,10 +88,13 @@ class KeywordRailNavigator extends Plugin {
 
   async getAiItems(file) {
     const content = await this.app.vault.read(file);
-    const hash = simpleHash(content);
     const stored = this.settings.cache[file.path];
-    if (stored?.hash === hash) return stored.items;
-    const segments = splitIntoContentSegments(content, this.settings.minCharacters);
+    // 已生成的导航是用户主动保存的结果；正文改动不自动清除或重提取。
+    // 仅重新计算每块的行号，尽量让微调后的跳转位置仍保持准确。
+    if (stored?.items?.length) {
+      const segments = splitIntoContentSegments(content, this.settings.minCharacters);
+      return stored.items.map((item, index) => ({ ...item, line: segments[index]?.line ?? item.line }));
+    }
     return [];
   }
 
