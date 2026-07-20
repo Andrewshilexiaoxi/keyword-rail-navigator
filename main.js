@@ -226,13 +226,36 @@ class KeywordRailNavigator extends Plugin {
     return result.replace(/[“”"'`，。；：、.!！?？\n]/g, "").slice(0, 16) || "内容主题";
   }
 
+  findElementForLine(view, line) {
+    const elements = [...view.containerEl.querySelectorAll("[data-line]")]
+      .map((element) => ({ element, line: Number(element.dataset.line) }))
+      .filter((item) => Number.isFinite(item.line));
+    return elements.find((item) => item.line >= line)?.element || view.containerEl.querySelector(".cm-active");
+  }
+
+  centerElementInView(view, line) {
+    const scroller = this.findDocumentScroller(view);
+    const target = this.findElementForLine(view, line);
+    if (!scroller || !target) return false;
+    const targetRect = target.getBoundingClientRect();
+    const scrollerRect = scroller.getBoundingClientRect();
+    const targetTop = scroller.scrollTop + targetRect.top - scrollerRect.top;
+    const centeredTop = Math.max(0, targetTop - (scroller.clientHeight - targetRect.height) / 2);
+    scroller.scrollTo({ top: centeredTop, behavior: "smooth" });
+    return true;
+  }
+
   async jumpTo(view, line) {
     const editor = view.editor;
-    if (editor) { editor.setCursor({ line, ch: 0 }); editor.scrollIntoView({ from: { line, ch: 0 }, to: { line, ch: 0 } }, true); return; }
-    const source = view.containerEl.querySelector(".markdown-preview-view");
-    const target = source?.querySelector(`[data-line=\"${line}\"]`) || source?.querySelector(`[data-heading]`);
-    if (target) { target.scrollIntoView({ behavior: "smooth", block: "start" }); return; }
+    if (editor) {
+      editor.setCursor({ line, ch: 0 });
+      editor.scrollIntoView({ from: { line, ch: 0 }, to: { line, ch: 0 } }, true);
+      window.setTimeout(() => this.centerElementInView(view, line), 40);
+      return;
+    }
+    if (this.centerElementInView(view, line)) return;
     await view.leaf.openFile(view.file, { active: true, eState: { line } });
+    window.setTimeout(() => this.centerElementInView(view, line), 40);
   }
 }
 
