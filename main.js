@@ -16,6 +16,7 @@ class KeywordRailNavigator extends Plugin {
     this.rail = null;
     this.currentFile = null;
     this.refreshTimer = null;
+    this.scrollTracker = null;
     this.addSettingTab(new KeywordRailSettings(this.app, this));
     this.addCommand({ id: "refresh-ai-keyword-navigation", name: "刷新当前文档的 AI 关键词导航", callback: () => this.refreshAiKeywords(true) });
     this.registerEvent(this.app.workspace.on("active-leaf-change", () => this.scheduleRender()));
@@ -37,7 +38,7 @@ class KeywordRailNavigator extends Plugin {
     return view?.file?.extension === "md" ? view : null;
   }
 
-  destroyRail() { this.rail?.remove(); this.rail = null; this.currentFile = null; }
+  destroyRail() { this.stopScrollTracking(); this.rail?.remove(); this.rail = null; this.currentFile = null; }
 
   async renderRail() {
     const view = this.getMarkdownView();
@@ -50,6 +51,8 @@ class KeywordRailNavigator extends Plugin {
     this.currentFile = view.file;
     const items = this.settings.mode === "ai" ? await this.getAiItems(view.file) : this.getHeadingItems(view.file);
     this.rail.empty();
+    this.rail.toggleClass("krn-mode-headings", this.settings.mode === "headings");
+    this.rail.toggleClass("krn-mode-ai", this.settings.mode === "ai");
     const switcher = this.rail.createDiv({ cls: "krn-mode-switch", attr: { "aria-label": "切换导航模式" } });
     this.createModeButton(switcher, "headings", "标题", "☷", "按 H2、H3 标题导航");
     this.createModeButton(switcher, "ai", "AI", "✦", "按 AI 内容关键词导航");
@@ -58,12 +61,88 @@ class KeywordRailNavigator extends Plugin {
       refresh.title = "为当前文档提取或重新提取 AI 内容关键词";
       refresh.addEventListener("click", () => this.refreshAiKeywords(true));
     }
+    const navigationEntries = [];
     for (const item of items) {
       const button = this.rail.createEl("button", { cls: "krn-item", text: item.label });
       button.dataset.level = String(item.level || 1);
+      button.dataset.mode = this.settings.mode;
       button.title = item.label;
-      button.addEventListener("click", () => this.jumpTo(view, item.line));
+      const entry = { button, line: item.line };
+      navigationEntries.push(entry);
+      button.addEventListener("click", () => {
+        this.setActiveNavigationItem(navigationEntries, navigationEntries.indexOf(entry));
+        this.jumpTo(view, item.line);
+      });
     }
+    this.startScrollTracking(view, navigationEntries);
+  }
+
+  startScrollTracking(view, entries) {
+    this.stopScrollTracking();
+    if (!entries.length) return;
+    const scroller = this.findDocumentScroller(view);
+    if (!scroller) return;
+    let animationFrame = null;
+    const update = () => {
+      animationFrame = null;
+      this.updateActiveNavigationItem(view, scroller, entries);
+    };
+    const onScroll = () => {
+      if (animationFrame === null) animationFrame = window.requestAnimationFrame(update);
+    };
+    scroller.addEventListener("scroll", onScroll, { passive: true });
+    this.scrollTracker = { scroller, onScroll, animationFrame };
+    onScroll();
+  }
+
+  stopScrollTracking() {
+    if (!this.scrollTracker) return;
+    this.scrollTracker.scroller.removeEventListener("scroll", this.scrollTracker.onScroll);
+    if (this.scrollTracker.animationFrame !== null) window.cancelAnimationFrame(this.scrollTracker.animationFrame);
+    this.scrollTracker = null;
+  }
+
+  findDocumentScroller(view) {
+    const candidates = [
+      view.containerEl.querySelector(".cm-scroller"),
+      view.containerEl.querySelector(".markdown-preview-view"),
+      view.containerEl.querySelector(".view-content"),
+      view.containerEl
+    ].filter(Boolean);
+    return candidates.find((element) => element.scrollHeight > element.clientHeight + 2) || candidates[0];
+  }
+
+  updateActiveNavigationItem(view, scroller, entries) {
+    const markerY = scroller.getBoundingClientRect().top + 88;
+    const elementsByLine = [...view.containerEl.querySelectorAll("[data-line]")]
+      .map((element) => ({ element, line: Number(element.dataset.line) }))
+      .filter((item) => Number.isFinite(item.line));
+    const targets = entries.map((entry) => {
+      const target = elementsByLine.find((item) => item.line >= entry.line);
+      return target ? target.element.getBoundingClientRect().top : null;
+    });
+    let activeIndex = -1;
+    if (targets.some((target) => target !== null)) {
+      targets.forEach((target, index) => { if (target !== null && target <= markerY) activeIndex = index; });
+      if (activeIndex < 0) activeIndex = targets.findIndex((target) => target !== null);
+    } else {
+      const maxLine = Math.max(...entries.map((entry) => entry.line), 1);
+      const progress = scroller.scrollTop / Math.max(1, scroller.scrollHeight - scroller.clientHeight);
+      const estimatedLine = progress * maxLine;
+      entries.forEach((entry, index) => { if (entry.line <= estimatedLine) activeIndex = index; });
+      if (activeIndex < 0) activeIndex = 0;
+    }
+    this.setActiveNavigationItem(entries, activeIndex);
+  }
+
+  setActiveNavigationItem(entries, activeIndex) {
+    entries.forEach((entry, index) => entry.button.toggleClass("is-active", index === activeIndex));
+    const activeButton = entries[activeIndex]?.button;
+    if (!activeButton || !this.rail) return;
+    const top = activeButton.offsetTop;
+    const bottom = top + activeButton.offsetHeight;
+    if (top < this.rail.scrollTop) this.rail.scrollTop = top - 4;
+    else if (bottom > this.rail.scrollTop + this.rail.clientHeight) this.rail.scrollTop = bottom - this.rail.clientHeight + 4;
   }
 
   createModeButton(host, mode, text, icon, title) {

@@ -44,8 +44,11 @@
 .krn-item::before { content: ""; display: inline-block; width: 4px; height: 4px; margin: 0 4px 1px 0; border-radius: 50%; background: var(--interactive-accent); opacity: .68; }
 .krn-item[data-level="2"] { padding-left: 8px; }
 .krn-item[data-level="3"], .krn-item[data-level="4"], .krn-item[data-level="5"], .krn-item[data-level="6"] { padding-left: 12px; }
-.krn-item:hover, .krn-item.is-active { background: var(--background-modifier-hover); color: var(--text-normal); }
-.krn-item.is-active::before { opacity: 1; transform: scale(1.45); }
+.krn-item:hover { background: var(--background-modifier-hover); color: var(--text-normal); }
+.krn-item.is-active { color: var(--text-normal); font-weight: 700; box-shadow: inset 2px 0 0 var(--interactive-accent); }
+.krn-mode-headings .krn-item.is-active { background: var(--background-modifier-hover); }
+.krn-mode-ai .krn-item.is-active { background: color-mix(in srgb, var(--interactive-accent) 18%, var(--background-primary)); }
+.krn-item.is-active::before { opacity: 1; transform: scale(1.7); }
 .krn-refresh { margin-bottom: 3px; padding: 4px; color: var(--text-faint); white-space: nowrap; }
 .krn-refresh:hover { color: var(--text-normal); }
 
