@@ -113,7 +113,15 @@ class KeywordRailNavigator extends Plugin {
   }
 
   updateActiveNavigationItem(view, scroller, entries) {
-    const markerY = scroller.getBoundingClientRect().top + 88;
+    // 点击跳转会把模块开头放在屏幕中央，因此高亮也必须以屏幕中央为判断点。
+    const markerY = scroller.getBoundingClientRect().top + scroller.clientHeight / 2;
+    const editorLine = this.getVisibleEditorLine(view, markerY);
+    if (editorLine !== null) {
+      let activeIndex = 0;
+      entries.forEach((entry, index) => { if (entry.line <= editorLine) activeIndex = index; });
+      this.setActiveNavigationItem(entries, activeIndex);
+      return;
+    }
     const elementsByLine = [...view.containerEl.querySelectorAll("[data-line]")]
       .map((element) => ({ element, line: Number(element.dataset.line) }))
       .filter((item) => Number.isFinite(item.line));
@@ -133,6 +141,19 @@ class KeywordRailNavigator extends Plugin {
       if (activeIndex < 0) activeIndex = 0;
     }
     this.setActiveNavigationItem(entries, activeIndex);
+  }
+
+  getVisibleEditorLine(view, markerY) {
+    const lines = [...view.containerEl.querySelectorAll(".cm-lineNumbers .cm-gutterElement")]
+      .map((element) => ({ line: Number(element.textContent.trim()) - 1, top: element.getBoundingClientRect().top }))
+      .filter((item) => Number.isInteger(item.line));
+    if (!lines.length) return null;
+    let current = lines[0].line;
+    for (const item of lines) {
+      if (item.top <= markerY) current = item.line;
+      else break;
+    }
+    return current;
   }
 
   setActiveNavigationItem(entries, activeIndex) {
