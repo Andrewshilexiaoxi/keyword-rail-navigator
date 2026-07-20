@@ -1,0 +1,53 @@
+.keyword-rail-navigator {
+  position: absolute;
+  z-index: 30;
+  top: 64px;
+  left: 5px;
+  right: auto;
+  width: 76px;
+  max-height: calc(100% - 82px);
+  overflow-y: auto;
+  overflow-x: visible;
+  padding: 4px;
+  border: 1px solid var(--background-modifier-border);
+  border-radius: 9px;
+  background: color-mix(in srgb, var(--background-primary) 88%, transparent);
+  box-shadow: 0 2px 12px var(--background-modifier-box-shadow);
+  scrollbar-width: none;
+  transition: width 140ms ease, background 140ms ease;
+}
+
+.keyword-rail-navigator::-webkit-scrollbar { display: none; }
+.keyword-rail-navigator:hover, .keyword-rail-navigator:focus-within { width: 110px; background: var(--background-primary); }
+
+.krn-mode-switch { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; margin-bottom: 4px; padding: 2px; border-radius: 6px; background: var(--background-secondary); }
+.krn-mode-button { min-width: 0; overflow: hidden; border: 0; border-radius: 4px; padding: 5px 2px; background: transparent; color: var(--text-muted); cursor: pointer; font-size: 11px; line-height: 1; white-space: nowrap; }
+.krn-mode-button:hover { color: var(--text-normal); background: var(--background-modifier-hover); }
+.krn-mode-button.is-active { color: var(--text-on-accent); background: var(--interactive-accent); font-weight: 600; }
+
+.krn-item, .krn-refresh {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
+  overflow: hidden;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--text-muted);
+  cursor: pointer;
+  font-size: 11px;
+  line-height: 1.25;
+  text-align: left;
+}
+
+.krn-item { min-height: 20px; padding: 4px; white-space: nowrap; text-overflow: ellipsis; }
+.krn-item::before { content: ""; display: inline-block; width: 4px; height: 4px; margin: 0 4px 1px 0; border-radius: 50%; background: var(--interactive-accent); opacity: .68; }
+.krn-item[data-level="2"] { padding-left: 8px; }
+.krn-item[data-level="3"], .krn-item[data-level="4"], .krn-item[data-level="5"], .krn-item[data-level="6"] { padding-left: 12px; }
+.krn-item:hover, .krn-item.is-active { background: var(--background-modifier-hover); color: var(--text-normal); }
+.krn-item.is-active::before { opacity: 1; transform: scale(1.45); }
+.krn-refresh { margin-bottom: 3px; padding: 4px; color: var(--text-faint); white-space: nowrap; }
+.krn-refresh:hover { color: var(--text-normal); }
+
+.workspace-leaf-content:has(.keyword-rail-navigator) .view-content { position: relative; }
+@media (max-width: 600px) { .keyword-rail-navigator { display: none; } }

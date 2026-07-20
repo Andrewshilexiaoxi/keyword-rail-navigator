@@ -1,0 +1,9 @@
+{
+  "id": "keyword-rail-navigator",
+  "name": "Keyword Rail Navigator",
+  "version": "0.1.0",
+  "minAppVersion": "1.5.0",
+  "description": "紧贴文档右侧的极简导航：标题导航或 AI 内容关键词导航。",
+  "author": "Andrew",
+  "isDesktopOnly": false
+}

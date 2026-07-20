@@ -1,0 +1,5 @@
+# Local Obsidian settings can contain an API key.
+data.json
+
+# Editor and operating-system files
+.DS_Store
