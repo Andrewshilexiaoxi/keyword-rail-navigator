@@ -190,10 +190,10 @@ class KeywordRailNavigator extends Plugin {
     const content = await this.app.vault.read(file);
     const stored = this.settings.cache[file.path];
     // 已生成的导航是用户主动保存的结果；正文改动不自动清除或重提取。
-    // 仅重新计算每块的行号，尽量让微调后的跳转位置仍保持准确。
+    // 本地重找关键词的实际出现行，使旧缓存也能获得正确锚点，无需调用 AI。
     if (stored?.items?.length) {
       const segments = splitIntoContentSegments(content, this.settings.minCharacters);
-      return stored.items.map((item, index) => ({ ...item, line: segments[index]?.line ?? item.line }));
+      return stored.items.map((item, index) => ({ ...item, line: findKeywordAnchorLine(segments[index], item.label, item.line) }));
     }
     return [];
   }
@@ -212,7 +212,7 @@ class KeywordRailNavigator extends Plugin {
     try {
       const labels = [];
       for (const segment of segments) labels.push(await this.extractKeyword(segment.text));
-      this.settings.cache[view.file.path] = { hash, items: segments.map((segment, i) => ({ label: labels[i], line: segment.line, level: 1 })), updatedAt: Date.now() };
+      this.settings.cache[view.file.path] = { hash, items: segments.map((segment, i) => ({ label: labels[i], line: findKeywordAnchorLine(segment, labels[i], segment.line), level: 1 })), updatedAt: Date.now() };
       await this.saveData(this.settings);
       new Notice("AI 关键词导航已更新。");
       await this.renderRail();
@@ -298,17 +298,34 @@ class KeywordRailSettings extends PluginSettingTab {
 }
 
 function splitIntoContentSegments(content, limit) {
-  const lines = content.replace(/^---[\s\S]*?---\s*/m, "").split("\n");
+  const lines = content.split("\n");
+  // 保留 YAML 前言所占的行数，避免后续 Markdown 行号整体提前。
+  if (lines[0]?.trim() === "---") {
+    const closingIndex = lines.slice(1).findIndex((line) => line.trim() === "---");
+    if (closingIndex >= 0) for (let index = 0; index <= closingIndex + 1; index += 1) lines[index] = "";
+  }
   const pieces = []; let buffer = []; let start = 0;
-  const flush = () => { const text = buffer.join("\n").replace(/^#+\s+.*$/gm, "").trim(); if (text.length > 80) pieces.push({ line: start, text }); buffer = []; };
+  const flush = () => { const rawLines = buffer; const text = rawLines.join("\n").replace(/^#+\s+.*$/gm, "").trim(); if (text.length > 80) pieces.push({ line: start, text, rawLines }); buffer = []; };
   lines.forEach((line, index) => {
     if (/^#{1,6}\s+/.test(line) && buffer.join("\n").length > 300) { flush(); start = index; }
-    if (!buffer.length) start = index;
+    if (!buffer.length) { if (/^\s*$/.test(line)) return; start = index; }
     buffer.push(line);
     if (buffer.join("\n").length >= limit && /^\s*$/.test(line)) flush();
   });
   flush();
   return pieces;
+}
+
+function findKeywordAnchorLine(segment, label, fallbackLine) {
+  if (!segment?.rawLines?.length) return fallbackLine;
+  const normalizedLabel = String(label || "").toLowerCase().trim().replace(/\s+/g, " ");
+  const candidates = [normalizedLabel];
+  if (/^[a-z][a-z\s-]+$/i.test(normalizedLabel)) candidates.push(normalizedLabel.split(/[\s-]+/)[0]);
+  for (let index = 0; index < segment.rawLines.length; index += 1) {
+    const line = segment.rawLines[index].toLowerCase().replace(/\s+/g, " ");
+    if (candidates.filter(Boolean).some((candidate) => line.includes(candidate))) return segment.line + index;
+  }
+  return segment.line ?? fallbackLine;
 }
 
 function simpleHash(value) { let hash = 2166136261; for (let i = 0; i < value.length; i += 1) { hash ^= value.charCodeAt(i); hash = Math.imul(hash, 16777619); } return (hash >>> 0).toString(36); }
