@@ -3,3 +3,6 @@ data.json
 
 # Editor and operating-system files
 .DS_Store
+
+# Release packages are uploaded to GitHub Releases, not committed to Git.
+*.zip
